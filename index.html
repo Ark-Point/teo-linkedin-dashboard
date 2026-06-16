@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEO LinkedIn 성장 대시보드</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif; }
+  .card { background:#fff; border:1px solid #e8ebf0; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+  ::-webkit-scrollbar{height:8px;width:8px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
+  input,select{outline:none}
+</style>
+</head>
+<body class="bg-[#f5f7fa] text-slate-800 min-h-screen">
+
+<div class="max-w-6xl mx-auto px-5 py-8">
+
+  <header class="flex flex-wrap items-end justify-between gap-4 mb-7">
+    <div>
+      <div class="text-xs font-semibold tracking-widest text-indigo-500 mb-1">LINKEDIN GROWTH · 4 콘텐츠 필러</div>
+      <h1 class="text-2xl font-bold text-slate-900">TEO (오태완) 성장 대시보드</h1>
+      <p class="text-sm text-slate-500 mt-1">목표 <b class="text-slate-700">10,000 팔로워</b> · 글·팔로워 입력 → 필러별 자동 분석</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="exportData()" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50">⬇ 백업</button>
+      <label class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">⬆ 복원
+        <input type="file" accept=".json" class="hidden" onchange="importData(event)"></label>
+      <button onclick="resetToSeed()" class="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">↺ 초기화</button>
+    </div>
+  </header>
+
+  <!-- Goal gauge -->
+  <section class="card p-6 mb-5">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-semibold text-slate-700">목표까지 진척</span>
+      <span class="text-sm text-slate-500"><b id="curFollowers" class="text-indigo-600 text-base">0</b> / 10,000</span>
+    </div>
+    <div class="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+      <div id="goalBar" class="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between mt-2 text-xs text-slate-400">
+      <span id="goalPct">0%</span><span id="goalRemain">—</span>
+    </div>
+  </section>
+
+  <!-- 발행 챌린지 (게임) -->
+  <section class="card p-5 mb-5">
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-sm font-semibold text-slate-700">🎮 발행 챌린지</div>
+      <div class="text-xs text-slate-400">매일 한 글 = 10,000명으로 가는 한 걸음</div>
+    </div>
+    <div class="grid md:grid-cols-3 gap-5 mt-3">
+      <div class="md:col-span-2 overflow-x-auto">
+        <div id="habitGrid"></div>
+        <div class="text-[11px] text-slate-400 mt-2">칸을 클릭해 그날 발행을 체크 · 과거 글은 자동 표시 ✓</div>
+      </div>
+      <div class="flex flex-col gap-3">
+        <div class="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-3 text-center">
+          <div class="text-3xl font-bold text-orange-500" id="streakNum">🔥 0</div>
+          <div class="text-[11px] text-orange-400 mt-0.5">연속 발행 (평일) · 최고 <span id="bestStreak">0</span></div>
+        </div>
+        <div class="rounded-xl border border-slate-100 p-3">
+          <div class="flex justify-between text-xs text-slate-500 mb-1"><span>이번 주 추진력</span><span><b id="weekCount">0</b>/5</span></div>
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden"><div id="weekBar" class="h-full bg-gradient-to-r from-indigo-500 to-violet-400 rounded-full transition-all" style="width:0%"></div></div>
+          <div id="gameMsg" class="text-[11px] text-slate-500 mt-2 leading-snug"></div>
+        </div>
+        <div class="text-center text-xs text-slate-400">총 <b id="totalPosts" class="text-slate-700">0</b>개 발행 · 10k 여정 동행 중 🚀</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KPI -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">현재 팔로워</div>
+      <div id="kpiFollowers" class="text-2xl font-bold text-slate-900">—</div>
+      <div id="kpiFollowersDelta" class="text-xs mt-1 text-slate-400">주간 순증 —</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">평균 댓글 / 글 <span class="text-indigo-400">★선행</span></div>
+      <div id="kpiComments" class="text-2xl font-bold text-slate-900">—</div>
+      <div class="text-xs mt-1 text-slate-400">도달의 진짜 동력</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">평균 좋아요 / 글</div>
+      <div id="kpiLikes" class="text-2xl font-bold text-slate-900">—</div>
+      <div id="kpiPosts" class="text-xs mt-1 text-slate-400">총 0개 글</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">10k까지 예상</div>
+      <div id="kpiEta" class="text-2xl font-bold text-slate-900">—</div>
+      <div class="text-xs mt-1 text-slate-400">최근 추세 기준</div></div>
+  </section>
+
+  <!-- Charts -->
+  <section class="grid md:grid-cols-2 gap-5 mb-5">
+    <div class="card p-5">
+      <div class="text-sm font-semibold text-slate-700 mb-3">팔로워 추이</div>
+      <canvas id="followerChart" height="130"></canvas>
+    </div>
+    <div class="card p-5">
+      <div class="text-sm font-semibold text-slate-700 mb-3">필러별 평균 engagement</div>
+      <canvas id="pillarChart" height="130"></canvas>
+    </div>
+  </section>
+
+  <!-- Pillar scorecard -->
+  <section class="card p-5 mb-5">
+    <div class="text-sm font-semibold text-slate-700 mb-3">콘텐츠 필러 성과표 <span class="text-xs text-slate-400 font-normal">— 각 필러의 역할이 다름</span></div>
+    <div id="pillarTable" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+  </section>
+
+  <!-- Insights -->
+  <section class="grid md:grid-cols-3 gap-4 mb-6">
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">🏆 베스트 글</div>
+      <div id="insBest" class="text-sm font-medium text-slate-700 leading-snug">—</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">🎯 최고 성과 필러</div>
+      <div id="insPillar" class="text-sm font-medium text-slate-700 leading-snug">—</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400 mb-1">🔁 추천 다음 액션</div>
+      <div id="insNext" class="text-sm font-medium text-slate-700 leading-snug">—</div></div>
+  </section>
+
+  <!-- Inputs -->
+  <section class="grid md:grid-cols-2 gap-5 mb-6">
+    <div class="card p-5 bg-slate-50">
+      <div class="text-sm font-semibold text-slate-700 mb-2">🗓️ 주간 운영 방식</div>
+      <ul class="text-xs text-slate-600 space-y-1.5 leading-relaxed list-disc pl-5">
+        <li><b>매일</b>: 글 올리면 위 <b>🎮 발행 챌린지</b>에서 그날 칸만 ✓ (10초)</li>
+        <li><b>주 1회</b>: 아래 <b>팔로워 수</b> 한 줄 기록</li>
+        <li><b>주 1회</b>: 지난주 글 성과(좋아요·댓글)는 <b>Claude가 한 번에 채움</b> — Ann은 입력 안 해도 됨</li>
+      </ul>
+      <div class="mt-3 text-[11px] text-slate-400">글 성과 데이터는 매주 일괄 업데이트 → 필러 성과표·차트 자동 갱신</div>
+    </div>
+    <div class="card p-5">
+      <div class="text-sm font-semibold text-slate-700 mb-3">＋ 팔로워 스냅샷 (주 1회)</div>
+      <div class="flex gap-2 text-sm">
+        <input id="fDate" type="date" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
+        <input id="fCount" type="number" placeholder="팔로워 수" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
+        <button onclick="addFollower()" class="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-4 rounded-lg">기록</button>
+      </div>
+      <div id="followerList" class="mt-3 space-y-1 text-xs text-slate-500 max-h-32 overflow-y-auto"></div>
+      <div class="mt-3 p-3 bg-indigo-50 rounded-lg text-xs text-indigo-700 leading-relaxed">
+        <b>현재값</b>: 2,386명 (2026-06-16, 프로필 자동입력). 매주 같은 요일에 갱신하세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- Posts table -->
+  <section class="card p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-sm font-semibold text-slate-700">글 성과 <span id="postCount" class="text-slate-400 font-normal"></span></div>
+      <div class="flex gap-2">
+        <select id="filterPillar" onchange="render()" class="text-xs border border-slate-200 rounded-lg px-2 py-1"><option value="">전체 필러</option></select>
+        <select id="sortBy" onchange="render()" class="text-xs border border-slate-200 rounded-lg px-2 py-1">
+          <option value="eng">engagement 순</option><option value="date">최신순</option>
+          <option value="comments">댓글 순</option><option value="rate">참여율 순</option>
+        </select>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-slate-400 border-b border-slate-100">
+          <th class="py-2 pr-2">날짜</th><th class="pr-2">필러</th><th class="pr-2">제목</th>
+          <th class="pr-2 text-right">👍</th><th class="pr-2 text-right">💬</th><th class="pr-2 text-right">🔁</th>
+          <th class="pr-2 text-right">참여율</th><th></th>
+        </tr></thead>
+        <tbody id="postsBody"></tbody>
+      </table>
+    </div>
+    <p id="emptyPosts" class="text-center text-sm text-slate-400 py-8">글이 없어요.</p>
+  </section>
+
+  <section class="card p-5 mb-10 bg-slate-50">
+    <div class="text-sm font-semibold text-slate-700 mb-2">📥 대표님께 요청할 데이터 (정확도 ↑)</div>
+    <ul class="text-xs text-slate-600 space-y-1.5 leading-relaxed list-disc pl-5">
+      <li><b>노출수(Impressions)</b>: 본인만 보임. 각 글 "분석 보기" → 노출수. 입력하면 <b>참여율</b>이 정확해져요.</li>
+      <li><b>프로필 방문·검색 노출</b>: <code class="bg-white px-1 rounded">linkedin.com/analytics</code>. 팔로우 직전 선행지표.</li>
+      <li><b>팔로워 수</b>: 주 1회 같은 요일 스냅샷.</li>
+    </ul>
+  </section>
+
+  <footer class="text-center text-xs text-slate-300 pb-8">데이터는 이 브라우저에 저장(localStorage). 다른 기기는 백업→복원. · v2 (4 필러)</footer>
+</div>
+
+<script>
+const SEED = {"followers": [{"date": "2026-06-16", "count": 2386}], "posts": [{"id": 1, "date": "2026-06-16", "pillar": "personal", "title": "30살 억만장자가 매일 “운동”을 1순위로 하는 이유를 이제야 알았습니다", "likes": 7, "comments": 2, "reposts": 0, "impr": 0}, {"id": 2, "date": "2026-06-15", "pillar": "build", "title": "AI와 크레이지아케이드 1:1 결투... AI가 사람처럼 키보드로 직접 게임을 할 수 ", "likes": 13, "comments": 0, "reposts": 0, "impr": 0}, {"id": 3, "date": "2026-06-13", "pillar": "build", "title": "크레이지아케이드 섭종한다고요? 딸깍으로 바로 만들었습니다. 추억을 평생 간직하세요!", "likes": 85, "comments": 14, "reposts": 1, "impr": 0}, {"id": 4, "date": "2026-06-12", "pillar": "build", "title": "'쿠팡'의 시대는 끝났다! 이젠 'AI 쿠팡'이다! (feat. AI 쿠팡 개발 후기)", "likes": 14, "comments": 0, "reposts": 0, "impr": 0}, {"id": 5, "date": "2026-06-10", "pillar": "industry", "title": "AI 시대, 우리나라 대기업과 일반 한국인의 기술 격차는 “몇년”이 아니라 “며칠” 단", "likes": 12, "comments": 0, "reposts": 0, "impr": 0}, {"id": 8, "date": "2026-05-17", "pillar": "build", "title": "하루 시간이 24시간으로 유한하듯, 하루에 먹을 수 있는 식사도 3회 이", "likes": 74, "comments": 3, "reposts": 4, "impr": 0}, {"id": 12, "date": "2026-05-17", "pillar": "industry", "title": "에이전트의 한계가 드러나는 순간", "likes": 7, "comments": 2, "reposts": 0, "impr": 0}, {"id": 13, "date": "2026-05-17", "pillar": "industry", "title": "안드레 카파시가 지난 몇 년간 그가 공개적으로 보여준 것은 거의 전부 '", "likes": 140, "comments": 3, "reposts": 35, "impr": 0}, {"id": 14, "date": "2026-05-17", "pillar": "field", "title": "스터디원 작품 쇼케이스👀", "likes": 14, "comments": 1, "reposts": 0, "impr": 0}, {"id": 15, "date": "2026-05-17", "pillar": "build", "title": "2월말 한번의 클로드코드 온보딩이 제 인생을 바꿔주고 있습니다. 그날의", "likes": 36, "comments": 3, "reposts": 1, "impr": 0}, {"id": 16, "date": "2026-04-17", "pillar": "field", "title": "어제 카페에서 5명이 모여서 클로드코드 1차 오프라인 스터디를 진행했습니", "likes": 43, "comments": 2, "reposts": 0, "impr": 0}, {"id": 17, "date": "2026-04-17", "pillar": "build", "title": "코드를 한 줄도 못 쓰던 문과 출신 CEO가 지금은 AI 에이전트 팀 가", "likes": 55, "comments": 5, "reposts": 5, "impr": 0}, {"id": 18, "date": "2026-04-17", "pillar": "build", "title": "클로드코드는 미친 괴물입니다. 코드 한 줄 못 짜는 제가, 제 아이폰과", "likes": 76, "comments": 1, "reposts": 7, "impr": 0}, {"id": 19, "date": "2026-06-14", "pillar": "build", "title": "AI 에이전트로 팀을 꾸려서 같이 일하고 있어요! 요즘 혼자 할 일이 많", "likes": 26, "comments": 0, "reposts": 0, "impr": 0}, {"id": 20, "date": "2026-03-18", "pillar": "industry", "title": "당신이 록히드마틴 CEO라면, 이 패배를 어떻게 보고하시겠습니까?", "likes": 19, "comments": 0, "reposts": 1, "impr": 0}, {"id": 22, "date": "2026-06-13", "pillar": "personal", "title": "고독한 주식가라는 텔레그램 채널이 있는데요. 원래 주식 채널을 운영하던", "likes": 12, "comments": 0, "reposts": 0, "impr": 0}, {"id": 23, "date": "2026-03-18", "pillar": "field", "title": "중국을 다시 가기 전, 심천은 제게 그냥 ‘테크 공장 도시’ 였습니다.", "likes": 66, "comments": 4, "reposts": 0, "impr": 0}, {"id": 25, "date": "2026-03-18", "pillar": "industry", "title": "엔비디아 : 칩 제조사를 넘어 '가장 빠른 조직'이 된 비결", "likes": 17, "comments": 1, "reposts": 1, "impr": 0}, {"id": 27, "date": "2026-01-17", "pillar": "insight", "title": "글로벌 시장에서는 스테이블코인 기반 결제·정산이 빠르게 도입되고 있지만,", "likes": 20, "comments": 4, "reposts": 0, "impr": 0}, {"id": 29, "date": "2026-01-17", "pillar": "insight", "title": "트럼프 일가가 만든 달러 스테이블코인 \"USD1\"으로 20% 이자 받는", "likes": 12, "comments": 0, "reposts": 0, "impr": 0}, {"id": 30, "date": "2026-01-17", "pillar": "insight", "title": "금 ETF에는 종종 김치 금 프리미엄이 낍니다! (최대 20%) 이럴 때", "likes": 11, "comments": 0, "reposts": 0, "impr": 0}, {"id": 31, "date": "2026-01-17", "pillar": "field", "title": "오늘 당일치기로 부산 BWB에 다녀왔는데요. 해시드 대표님이 키노트에서", "likes": 40, "comments": 0, "reposts": 1, "impr": 0}, {"id": 37, "date": "2026-06-08", "pillar": "insight", "title": "BlackRock에서 BUIDL을 설계한 친구가 잘 다니던 회사를 퇴사하", "likes": 62, "comments": 9, "reposts": 1, "impr": 0}, {"id": 38, "date": "2025-10-19", "pillar": "field", "title": "KBW 기간에 부산에 다녀왔습니다! FlyAsia라는 글로벌 VC들과 국", "likes": 39, "comments": 1, "reposts": 0, "impr": 0}, {"id": 39, "date": "2025-10-19", "pillar": "field", "title": "국내외 금융 기관과 Web3 기업들이 함께 모여서 진행한 KBW Web3", "likes": 29, "comments": 0, "reposts": 0, "impr": 0}, {"id": 40, "date": "2025-10-19", "pillar": "insight", "title": "구글이 금융을 위한 레이어1(GCUL) 발표에 이어 스테이블코인을 활용한", "likes": 35, "comments": 3, "reposts": 2, "impr": 0}, {"id": 41, "date": "2025-09-19", "pillar": "field", "title": "올해 KBW 사이드 이벤트, 컨퍼런스 정리 시트 공유드립니다.  http", "likes": 23, "comments": 0, "reposts": 0, "impr": 0}, {"id": 44, "date": "2025-07-21", "pillar": "insight", "title": "테더의 신사업과 미래 전략 방향성은? - 테더사 CEO 팟캐스트 요약(3", "likes": 14, "comments": 0, "reposts": 0, "impr": 0}, {"id": 45, "date": "2025-07-21", "pillar": "insight", "title": "지니어스엑트에 따른 USDT의 대응과 전략 변화는? - 테더사 CEO 팟", "likes": 10, "comments": 0, "reposts": 2, "impr": 0}, {"id": 46, "date": "2025-07-21", "pillar": "insight", "title": "USDT는 미국보다 신흥국 공략? - 테더사 CEO 팟캐스트 요약(1)", "likes": 14, "comments": 0, "reposts": 2, "impr": 0}, {"id": 50, "date": "2025-06-16", "pillar": "insight", "title": "얼마전 BCG에서 스테이블코인 리서치가 발간되었는데요. 보고서에서는 현재", "likes": 106, "comments": 91, "reposts": 9, "impr": 0}, {"id": 52, "date": "2025-06-16", "pillar": "field", "title": "저희가 2025년 초기창업패키지에 최종 선정되었습니다!🔥 내년에 초창패에", "likes": 51, "comments": 7, "reposts": 1, "impr": 0}, {"id": 54, "date": "2025-06-16", "pillar": "field", "title": "💙 INF가 주최하는 \"Road to Agentic Future\" AI", "likes": 15, "comments": 0, "reposts": 0, "impr": 0}, {"id": 56, "date": "2025-06-16", "pillar": "field", "title": "저희가 이번주 4월 13일 일요일 오후 1:30부터 5:30까지 \"Bui", "likes": 18, "comments": 1, "reposts": 0, "impr": 0}, {"id": 57, "date": "2025-06-16", "pillar": "insight", "title": "지난 금요일 금융위원회가 가상자산사업자(VASP) 신고 현황을 공개했는데", "likes": 82, "comments": 0, "reposts": 5, "impr": 0}, {"id": 58, "date": "2025-06-16", "pillar": "drop", "title": "피터틸 스탠포드 강연  https://lnkd.in/gbA34kd6  -", "likes": 2, "comments": 0, "reposts": 0, "impr": 0}, {"id": 59, "date": "2025-06-16", "pillar": "drop", "title": "4번과 5번에서 많이 배웠네요! ㅎㅎ  == 4. 자율출퇴근의 진정한 의", "likes": 11, "comments": 0, "reposts": 0, "impr": 0}, {"id": 61, "date": "2026-06-15", "pillar": "insight", "title": "트럼프 대통령의 관세 정책의 크기와 우리나라 영향 정리", "likes": 9, "comments": 0, "reposts": 0, "impr": 0}, {"id": 64, "date": "2025-06-16", "pillar": "drop", "title": "크 이렇게 빨리 업데이트가 되는군요!! 멋드러집니다!!  ---", "likes": 1, "comments": 0, "reposts": 0, "impr": 0}, {"id": 65, "date": "2025-06-16", "pillar": "industry", "title": "GPT‘s T(Attention is All You Need 공동 저자)", "likes": 23, "comments": 1, "reposts": 0, "impr": 0}, {"id": 66, "date": "2025-06-16", "pillar": "field", "title": "🔥AI Blockchain Community Kick-off Event🔥", "likes": 21, "comments": 0, "reposts": 1, "impr": 0}, {"id": 69, "date": "2025-06-16", "pillar": "field", "title": "🎃 이번주 일요일, Web3 할로윈 행사에 여러분을 초대합니다! 친구들", "likes": 15, "comments": 0, "reposts": 0, "impr": 0}, {"id": 73, "date": "2025-06-16", "pillar": "drop", "title": "오 이런 일화가 있었군요! ㅋㅋㅋ 메이투안에서 싸게 영화보려고 영화관 앞", "likes": 4, "comments": 0, "reposts": 0, "impr": 0}, {"id": 74, "date": "2025-06-16", "pillar": "insight", "title": "🚀 AI 비즈니스 분석 보고서 책자를 받아보세요! [한정판]📘 링친 여러", "likes": 96, "comments": 57, "reposts": 4, "impr": 0}, {"id": 75, "date": "2025-06-16", "pillar": "drop", "title": "좋아하는 프레임워크가 다 있네요!  ---", "likes": 6, "comments": 0, "reposts": 0, "impr": 0}, {"id": 76, "date": "2025-06-16", "pillar": "insight", "title": "우리나라는 \"빨리빨리\"(문화), 높은 인터넷 보급률(인프라), 토스, 네", "likes": 20, "comments": 0, "reposts": 4, "impr": 0}, {"id": 77, "date": "2025-06-16", "pillar": "insight", "title": "피치북에 따르면 2024년 VC들은 크립토에 총 120억달러를 투자할 것", "likes": 34, "comments": 3, "reposts": 5, "impr": 0}, {"id": 48, "date": "2026-05-15", "pillar": "build", "title": "토스 \"국회의원 맛집 지도\" 삭제 당한 후기", "likes": 713, "comments": 19, "reposts": 0, "impr": 0}]};
+const GOAL = 10000;
+const KEY = 'linkedin_teo_v2';
+const PILLARS = {
+  build:    {label:'🔨 AI빌더',     role:'폭발·차별화',   color:'#4f46e5'},
+  insight:  {label:'🧠 전문인사이트', role:'댓글·신뢰',    color:'#0891b2'},
+  industry: {label:'🚀 산업읽기',    role:'리포스트·도달', color:'#7c3aed'},
+  field:    {label:'🤝 현장·커뮤니티', role:'관계',        color:'#f59e0b'},
+  personal: {label:'🌱 개인·생각',   role:'연결(샘플小)',  color:'#16a34a'},
+  drop:     {label:'⚪ 단순 공유',    role:'저효율·최소화', color:'#cbd5e1'},
+};
+let data = load();
+let fChart, pChart;
+
+function load(){
+  try { const s=localStorage.getItem(KEY); return s? JSON.parse(s) : JSON.parse(JSON.stringify(SEED)); }
+  catch(e){ return JSON.parse(JSON.stringify(SEED)); }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)); cloudSavePush(); }
+// ---- Supabase 실시간 동기화 (키 없으면 자동 localStorage 모드) ----
+const SB_URL='__SB_URL__', SB_KEY='__SB_KEY__';
+const SB_ON = SB_URL && SB_URL.indexOf('__')!==0;
+let sbTimer=null;
+function cloudSavePush(){ if(!SB_ON) return; clearTimeout(sbTimer); sbTimer=setTimeout(async()=>{
+  try{ await fetch(`${SB_URL}/rest/v1/teo_dashboard`,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({id:'main',data,updated_at:new Date().toISOString()})}); }catch(e){} },800); }
+async function cloudLoad(){ if(!SB_ON) return null; try{ const r=await fetch(`${SB_URL}/rest/v1/teo_dashboard?id=eq.main&select=data`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}); const j=await r.json(); return (j&&j[0])?j[0].data:null; }catch(e){ return null; } }
+async function syncPull(){ const c=await cloudLoad(); if(c && JSON.stringify(c)!==JSON.stringify(data)){ data=c; data.postLog=data.postLog||[]; render(); } }
+function resetToSeed(){ if(confirm('과거 48개 글 + 팔로워 2,386으로 초기화할까요?')){ localStorage.removeItem(KEY); data=JSON.parse(JSON.stringify(SEED)); save(); render(); } }
+function uid(){ return data.posts.reduce((m,p)=>Math.max(m,p.id||0),0)+1; }
+
+function delPost(id){ data.posts=data.posts.filter(p=>p.id!==id); save(); render(); }
+function addFollower(){
+  const date=document.getElementById('fDate').value, count=+document.getElementById('fCount').value;
+  if(!date||!count){ alert('날짜와 팔로워 수'); return; }
+  data.followers=data.followers.filter(f=>f.date!==date); data.followers.push({date,count});
+  data.followers.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('fCount').value=''; save(); render();
+}
+function delFollower(date){ data.followers=data.followers.filter(f=>f.date!==date); save(); render(); }
+function eng(p){ return (p.likes||0)+(p.comments||0)+(p.reposts||0); }
+function rate(p){ return p.impr>0 ? (eng(p)/p.impr*100) : null; }
+function avg(arr,f){ return arr.length? arr.reduce((s,p)=>s+f(p),0)/arr.length : 0; }
+
+function pillarStats(){
+  const s={};
+  for(const k in PILLARS){ const ps=data.posts.filter(p=>p.pillar===k);
+    s[k]={n:ps.length, eng:avg(ps,eng), comm:avg(ps,p=>p.comments), rep:avg(ps,p=>p.reposts)}; }
+  return s;
+}
+
+// ---- 발행 챌린지 (게임) ----
+function ymd(d){ const x=new Date(d); x.setHours(0,0,0,0); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
+function isWeekday(d){ const w=d.getDay(); return w!==0&&w!==6; }
+function mondayOf(d){ const x=new Date(d); const off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); x.setHours(0,0,0,0); return x; }
+function dayChecked(s){ return (data.postLog&&data.postLog.includes(s)) || data.posts.some(p=>p.date===s); }
+function toggleDay(s){ data.postLog=data.postLog||[]; const i=data.postLog.indexOf(s); if(i>=0)data.postLog.splice(i,1); else data.postLog.push(s); save(); renderGame(); }
+function calcStreak(){ let d=new Date(); d.setHours(0,0,0,0);
+  if(isWeekday(d)&&!dayChecked(ymd(d))) d.setDate(d.getDate()-1);
+  let s=0; for(let i=0;i<800;i++){ if(isWeekday(d)){ if(dayChecked(ymd(d))) s++; else break; } d.setDate(d.getDate()-1); } return s; }
+function bestStreak(){ const set=new Set([...(data.postLog||[]),...data.posts.map(p=>p.date)]); if(!set.size)return 0;
+  let d=new Date([...set].sort()[0]); d.setHours(0,0,0,0); const end=new Date(); end.setHours(0,0,0,0);
+  let cur=0,best=0; while(d<=end){ if(isWeekday(d)){ if(set.has(ymd(d))){cur++;best=Math.max(best,cur);} else cur=0; } d.setDate(d.getDate()+1); } return best; }
+function renderGame(){
+  data.postLog=data.postLog||[];
+  const today=new Date(); today.setHours(0,0,0,0); const curMon=mondayOf(today);
+  const names=['월','화','수','목','금'];
+  let h='<div class="flex gap-1 mb-1"><div class="w-10"></div>'+names.map(n=>`<div class="w-9 text-center text-[10px] text-slate-400">${n}</div>`).join('')+'</div>';
+  for(let w=5;w>=0;w--){ const mon=new Date(curMon); mon.setDate(mon.getDate()-w*7);
+    h+='<div class="flex gap-1 mb-1 items-center"><div class="w-10 text-[10px] text-slate-300">'+(mon.getMonth()+1)+'/'+mon.getDate()+'</div>';
+    for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); const s=ymd(d);
+      const fut=d>today, ck=dayChecked(s), tod=s===ymd(today);
+      const cls=ck?'bg-indigo-500 text-white border-indigo-500':fut?'bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed':'bg-white text-slate-400 border-slate-200 hover:border-indigo-300';
+      h+=`<button ${fut?'disabled':''} onclick="toggleDay('${s}')" class="w-9 h-9 rounded-lg border text-[11px] flex items-center justify-center transition ${cls} ${tod?'ring-2 ring-indigo-300':''}">${ck?'✓':d.getDate()}</button>`;
+    } h+='</div>'; }
+  document.getElementById('habitGrid').innerHTML=h;
+  const wk=[]; for(let i=0;i<5;i++){ const d=new Date(curMon); d.setDate(d.getDate()+i); wk.push(ymd(d)); }
+  const wc=wk.filter(dayChecked).length;
+  document.getElementById('weekCount').textContent=wc;
+  document.getElementById('weekBar').style.width=(wc/5*100)+'%';
+  document.getElementById('streakNum').textContent='🔥 '+calcStreak();
+  document.getElementById('bestStreak').textContent=bestStreak();
+  const total=new Set([...(data.postLog||[]),...data.posts.map(p=>p.date)]).size;
+  document.getElementById('totalPosts').textContent=total;
+  const remain=Math.max(0,GOAL-(data.followers.length?data.followers[data.followers.length-1].count:0));
+  const st=calcStreak(); let msg;
+  if(wc>=5) msg='🚀 이번 주 만렙! 이 꾸준함이 10k를 만듭니다.';
+  else if(st>=3) msg=`🔥 ${st}일 연속! 멈추지 마세요 — 10k까지 ${remain.toLocaleString()}명.`;
+  else if(wc>0) msg=`좋아요! 이번 주 ${5-wc}개 더 = 만렙. 한 글이 10k로 가는 한 걸음.`;
+  else msg='오늘 한 글 체크하고 스트릭을 시작하세요 🔥';
+  document.getElementById('gameMsg').innerHTML=msg;
+}
+
+function render(){
+  const posts=data.posts, folls=data.followers;
+  const latest=folls.length? folls[folls.length-1].count:0;
+  document.getElementById('curFollowers').textContent=latest.toLocaleString();
+  document.getElementById('kpiFollowers').textContent=latest?latest.toLocaleString():'—';
+  const pct=Math.min(100,latest/GOAL*100);
+  document.getElementById('goalBar').style.width=pct+'%';
+  document.getElementById('goalPct').textContent=pct.toFixed(1)+'%';
+  document.getElementById('goalRemain').textContent=Math.max(0,GOAL-latest).toLocaleString()+'명 남음';
+
+  let delta=null,eta='—';
+  if(folls.length>=2){ const a=folls[folls.length-2],b=folls[folls.length-1];
+    const days=Math.max(1,(new Date(b.date)-new Date(a.date))/86400000), pw=(b.count-a.count)/days*7;
+    delta=pw; if(pw>0){ const w=(GOAL-latest)/pw; eta=w<=0?'달성!':(w<8?Math.round(w)+'주':(w/4.33).toFixed(1)+'개월'); } }
+  document.getElementById('kpiFollowersDelta').textContent=delta===null?'주간 순증 —':'주간 순증 '+(delta>=0?'+':'')+Math.round(delta);
+  document.getElementById('kpiEta').textContent=eta;
+  document.getElementById('kpiPosts').textContent='총 '+posts.length+'개 글';
+  document.getElementById('postCount').textContent='('+posts.length+')';
+  document.getElementById('kpiComments').textContent=posts.length?avg(posts,p=>p.comments).toFixed(1):'—';
+  document.getElementById('kpiLikes').textContent=posts.length?Math.round(avg(posts,p=>p.likes)):'—';
+
+  const st=pillarStats();
+  document.getElementById('pillarTable').innerHTML=Object.keys(PILLARS).map(k=>{
+    const p=PILLARS[k],s=st[k];
+    return `<div class="rounded-xl border border-slate-100 p-3" style="border-top:3px solid ${p.color}">
+      <div class="text-xs font-semibold text-slate-700">${p.label}</div>
+      <div class="text-[10px] text-slate-400 mb-1">${p.role}</div>
+      <div class="text-lg font-bold text-slate-900">${s.eng.toFixed(0)}</div>
+      <div class="text-[10px] text-slate-400">평균eng · ${s.n}개 · 💬${s.comm.toFixed(1)} 🔁${s.rep.toFixed(1)}</div></div>`;
+  }).join('');
+  drawPillar(st);
+
+  if(posts.length){
+    const best=[...posts].sort((a,b)=>eng(b)-eng(a))[0];
+    document.getElementById('insBest').innerHTML=`"${best.title||'(제목없음)'}"<br><span class="text-xs text-slate-400">${PILLARS[best.pillar]?.label||''} · 👍${best.likes} 💬${best.comments} 🔁${best.reposts}</span>`;
+    const cand=Object.keys(st).filter(k=>k!=='drop'&&st[k].n>=1).sort((a,b)=>st[b].eng-st[a].eng);
+    if(cand.length){ const k=cand[0],p=PILLARS[k],s=st[k];
+      document.getElementById('insPillar').innerHTML=`<b>${p.label}</b> (${p.role})<br><span class="text-xs text-slate-400">평균 ${s.eng.toFixed(0)} engagement · 이 필러를 더 자주</span>`; }
+    const total=posts.length, dropN=st.drop.n, buildShare=st.build.n/total;
+    let rec;
+    if(dropN>=3) rec=`⚪ 단순 공유 글 ${dropN}개 = 도달 낮음. 줄이고 그 슬롯을 🔨AI빌더로.`;
+    else if(buildShare<0.25) rec=`🔨 AI빌더가 최고 성과인데 비중이 낮아요(${Math.round(buildShare*100)}%). <b>주 2회</b>로 늘리기.`;
+    else rec=`🧠 인사이트엔 <b>댓글 CTA·리드마그넷</b>을, 🚀산업읽기는 <b>리포스트 유도</b>로 새 네트워크 도달.`;
+    document.getElementById('insNext').innerHTML=rec;
+  }
+  renderPosts(); renderFollowerList(); drawFollower(); renderGame();
+}
+
+function renderPosts(){
+  const body=document.getElementById('postsBody'), empty=document.getElementById('emptyPosts');
+  let posts=[...data.posts];
+  const fp=document.getElementById('filterPillar').value;
+  if(fp) posts=posts.filter(p=>p.pillar===fp);
+  const sb=document.getElementById('sortBy').value;
+  posts.sort((a,b)=> sb==='date'?b.date.localeCompare(a.date) : sb==='comments'?b.comments-a.comments
+    : sb==='rate'?((rate(b)??-1)-(rate(a)??-1)) : eng(b)-eng(a));
+  empty.style.display=posts.length?'none':'block';
+  body.innerHTML=posts.map(p=>{ const pl=PILLARS[p.pillar]||PILLARS.drop;
+    return `<tr class="border-b border-slate-50 hover:bg-slate-50/60">
+    <td class="py-2 pr-2 text-slate-500 whitespace-nowrap">${p.date.slice(5)}</td>
+    <td class="pr-2 whitespace-nowrap"><span class="text-[10px] px-2 py-0.5 rounded-full" style="background:${pl.color}1a;color:${pl.color}">${pl.label}</span></td>
+    <td class="pr-2 max-w-[200px] truncate text-slate-700">${p.title||'<span class="text-slate-300">—</span>'}</td>
+    <td class="pr-2 text-right">${p.likes}</td>
+    <td class="pr-2 text-right font-semibold text-cyan-700">${p.comments}</td>
+    <td class="pr-2 text-right text-slate-500">${p.reposts}</td>
+    <td class="pr-2 text-right text-slate-500">${rate(p)!==null?rate(p).toFixed(1)+'%':'<span class="text-slate-300">—</span>'}</td>
+    <td class="text-right"><button onclick="delPost(${p.id})" class="text-slate-300 hover:text-red-500 px-1">×</button></td></tr>`;
+  }).join('');
+}
+function renderFollowerList(){
+  document.getElementById('followerList').innerHTML=[...data.followers].reverse().map(f=>
+    `<div class="flex justify-between"><span>${f.date}</span><span><b class="text-slate-700">${f.count.toLocaleString()}</b> <button onclick="delFollower('${f.date}')" class="text-slate-300 hover:text-red-500 ml-1">×</button></span></div>`).join('')||'<div class="text-slate-300">기록 없음</div>';
+}
+function drawFollower(){
+  const ctx=document.getElementById('followerChart');
+  const labels=data.followers.map(f=>f.date.slice(5)), vals=data.followers.map(f=>f.count);
+  if(fChart) fChart.destroy();
+  fChart=new Chart(ctx,{type:'line',data:{labels,datasets:[
+    {label:'팔로워',data:vals,borderColor:'#4f46e5',backgroundColor:'rgba(79,70,229,.08)',fill:true,tension:.3,pointRadius:3},
+    {label:'목표',data:labels.map(()=>GOAL),borderColor:'#cbd5e1',borderDash:[5,5],pointRadius:0}
+  ]},options:{plugins:{legend:{display:false}},scales:{y:{grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+}
+function drawPillar(st){
+  const ctx=document.getElementById('pillarChart');
+  const keys=Object.keys(PILLARS);
+  if(pChart) pChart.destroy();
+  pChart=new Chart(ctx,{type:'bar',data:{labels:keys.map(k=>PILLARS[k].label),
+    datasets:[{data:keys.map(k=>st[k].eng),backgroundColor:keys.map(k=>PILLARS[k].color),borderRadius:6}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+}
+function exportData(){ const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='teo-linkedin-data.json';a.click(); }
+function importData(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{ data=JSON.parse(r.result); save(); render(); alert('복원 완료'); }catch(err){ alert('파일 오류'); } }; r.readAsText(f); }
+
+const today=new Date().toISOString().slice(0,10);
+document.getElementById('fDate').value=today;
+document.getElementById('filterPillar').innerHTML='<option value="">전체 필러</option>'+Object.keys(PILLARS).map(k=>`<option value="${k}">${PILLARS[k].label}</option>`).join('');
+(async function init(){
+  if(SB_ON){ const c=await cloudLoad(); if(c){ data=c; data.postLog=data.postLog||[]; } else { cloudSavePush(); } }
+  render();
+  if(SB_ON) setInterval(syncPull, 12000);
+})();
+</script>
+</body>
+</html>
