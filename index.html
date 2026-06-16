@@ -24,10 +24,10 @@
       <p class="text-sm text-slate-500 mt-1">목표 <b class="text-slate-700">10,000 팔로워</b> · 글·팔로워 입력 → 필러별 자동 분석</p>
     </div>
     <div class="flex gap-2">
-      <button onclick="exportData()" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50">⬇ 백업</button>
-      <label class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">⬆ 복원
+      <button onclick="exportData()" title="지금 데이터를 파일 1개로 내려받아 보관 (안전 복사본)" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50">💾 파일로 저장</button>
+      <label title="저장해둔 백업 파일을 다시 불러오기" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">📂 파일 불러오기
         <input type="file" accept=".json" class="hidden" onchange="importData(event)"></label>
-      <button onclick="resetToSeed()" class="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">↺ 초기화</button>
+      <button onclick="resetToSeed()" title="처음 수집된 데이터로 되돌리기" class="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">↺ 처음으로</button>
     </div>
   </header>
 
@@ -53,8 +53,8 @@
     </div>
     <div class="grid md:grid-cols-3 gap-5 mt-3">
       <div class="md:col-span-2 overflow-x-auto">
-        <div id="habitGrid"></div>
-        <div class="text-[11px] text-slate-400 mt-2">칸을 클릭해 그날 발행을 체크 · 과거 글은 자동 표시 ✓</div>
+        <div id="habitGrid" class="max-h-56 overflow-y-auto pr-1"></div>
+        <div class="text-[11px] text-slate-400 mt-2">칸 클릭=발행 체크 · 수집된 글 자동 ✓ · ↕ 스크롤로 과거 보기</div>
       </div>
       <div class="flex flex-col gap-3">
         <div class="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-3 text-center">
@@ -127,15 +127,16 @@
       <div class="mt-3 text-[11px] text-slate-400">글 성과 데이터는 매주 일괄 업데이트 → 필러 성과표·차트 자동 갱신</div>
     </div>
     <div class="card p-5">
-      <div class="text-sm font-semibold text-slate-700 mb-3">＋ 팔로워 스냅샷 (주 1회)</div>
+      <div class="text-sm font-semibold text-slate-700 mb-3">📈 팔로워 (매일 기록)</div>
       <div class="flex gap-2 text-sm">
         <input id="fDate" type="date" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
         <input id="fCount" type="number" placeholder="팔로워 수" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
         <button onclick="addFollower()" class="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-4 rounded-lg">기록</button>
       </div>
-      <div id="followerList" class="mt-3 space-y-1 text-xs text-slate-500 max-h-32 overflow-y-auto"></div>
+      <div id="followerDelta" class="mt-3 grid grid-cols-2 gap-2"></div>
+      <div id="followerList" class="mt-2 space-y-1 text-xs text-slate-500 max-h-24 overflow-y-auto"></div>
       <div class="mt-3 p-3 bg-indigo-50 rounded-lg text-xs text-indigo-700 leading-relaxed">
-        <b>현재값</b>: 2,386명 (2026-06-16, 프로필 자동입력). 매주 같은 요일에 갱신하세요.
+        <b>매일</b> 프로필에서 팔로워 수 보고 한 줄 기록 (10초) → 증감률 자동 계산
       </div>
     </div>
   </section>
@@ -244,15 +245,22 @@ function renderGame(){
   data.postLog=data.postLog||[];
   const today=new Date(); today.setHours(0,0,0,0); const curMon=mondayOf(today);
   const names=['월','화','수','목','금'];
-  let h='<div class="flex gap-1 mb-1"><div class="w-10"></div>'+names.map(n=>`<div class="w-9 text-center text-[10px] text-slate-400">${n}</div>`).join('')+'</div>';
-  for(let w=5;w>=0;w--){ const mon=new Date(curMon); mon.setDate(mon.getDate()-w*7);
-    h+='<div class="flex gap-1 mb-1 items-center"><div class="w-10 text-[10px] text-slate-300">'+(mon.getMonth()+1)+'/'+mon.getDate()+'</div>';
+  // 그리드 범위: 수집된 가장 오래된 글 ~ 오늘 (최소 6주, 최대 60주)
+  const allD=[...(data.postLog||[]),...data.posts.map(p=>p.date)].filter(Boolean).sort();
+  let startMon=new Date(curMon); startMon.setDate(startMon.getDate()-5*7);
+  if(allD.length){ const e=mondayOf(new Date(allD[0])); if(e<startMon) startMon=e; }
+  const capMon=new Date(curMon); capMon.setDate(capMon.getDate()-60*7);
+  if(startMon<capMon) startMon=capMon;
+  const weeksN=Math.max(5, Math.round((curMon-startMon)/(7*86400000)));
+  let h='<div class="flex gap-1 mb-1 sticky top-0 bg-white z-10"><div class="w-12"></div>'+names.map(n=>`<div class="w-9 text-center text-[10px] text-slate-400">${n}</div>`).join('')+'</div>';
+  for(let w=weeksN;w>=0;w--){ const mon=new Date(curMon); mon.setDate(mon.getDate()-w*7);
+    h+='<div class="flex gap-1 mb-1 items-center"><div class="w-12 text-[10px] text-slate-300">'+(mon.getFullYear()%100)+'.'+(mon.getMonth()+1)+'/'+mon.getDate()+'</div>';
     for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); const s=ymd(d);
       const fut=d>today, ck=dayChecked(s), tod=s===ymd(today);
       const cls=ck?'bg-indigo-500 text-white border-indigo-500':fut?'bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed':'bg-white text-slate-400 border-slate-200 hover:border-indigo-300';
       h+=`<button ${fut?'disabled':''} onclick="toggleDay('${s}')" class="w-9 h-9 rounded-lg border text-[11px] flex items-center justify-center transition ${cls} ${tod?'ring-2 ring-indigo-300':''}">${ck?'✓':d.getDate()}</button>`;
     } h+='</div>'; }
-  document.getElementById('habitGrid').innerHTML=h;
+  const hg=document.getElementById('habitGrid'); hg.innerHTML=h; hg.scrollTop=hg.scrollHeight;
   const wk=[]; for(let i=0;i<5;i++){ const d=new Date(curMon); d.setDate(d.getDate()+i); wk.push(ymd(d)); }
   const wc=wk.filter(dayChecked).length;
   document.getElementById('weekCount').textContent=wc;
@@ -284,7 +292,13 @@ function render(){
   if(folls.length>=2){ const a=folls[folls.length-2],b=folls[folls.length-1];
     const days=Math.max(1,(new Date(b.date)-new Date(a.date))/86400000), pw=(b.count-a.count)/days*7;
     delta=pw; if(pw>0){ const w=(GOAL-latest)/pw; eta=w<=0?'달성!':(w<8?Math.round(w)+'주':(w/4.33).toFixed(1)+'개월'); } }
-  document.getElementById('kpiFollowersDelta').textContent=delta===null?'주간 순증 —':'주간 순증 '+(delta>=0?'+':'')+Math.round(delta);
+  const lastD = folls.length>=2 ? latest-folls[folls.length-2].count : null;
+  document.getElementById('kpiFollowersDelta').textContent = lastD===null?'지난 기록 대비 —':'지난 기록 '+(lastD>=0?'+':'')+lastD.toLocaleString();
+  const dCard=(label,cur,base)=>{ if(base==null||cur==null) return `<div class="rounded-lg border border-slate-100 p-2 text-center"><div class="text-[10px] text-slate-400">${label}</div><div class="text-sm font-bold text-slate-300">—</div></div>`;
+    const dv=cur-base, p=base?dv/base*100:0, c=dv>0?'text-emerald-600':dv<0?'text-rose-500':'text-slate-500', s=dv>0?'+':'';
+    return `<div class="rounded-lg border border-slate-100 p-2 text-center"><div class="text-[10px] text-slate-400">${label}</div><div class="text-sm font-bold ${c}">${s}${dv.toLocaleString()}<span class="text-[10px] font-normal"> (${s}${p.toFixed(2)}%)</span></div></div>`; };
+  const fde=document.getElementById('followerDelta');
+  if(fde) fde.innerHTML = folls.length? (dCard('지난 기록 대비', latest, folls.length>=2?folls[folls.length-2].count:null)+dCard('시작값 대비', latest, folls[0].count)) : '';
   document.getElementById('kpiEta').textContent=eta;
   document.getElementById('kpiPosts').textContent='총 '+posts.length+'개 글';
   document.getElementById('postCount').textContent='('+posts.length+')';
