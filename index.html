@@ -127,7 +127,10 @@
       <div class="mt-3 text-[11px] text-slate-400">글 성과 데이터는 매주 일괄 업데이트 → 필러 성과표·차트 자동 갱신</div>
     </div>
     <div class="card p-5">
-      <div class="text-sm font-semibold text-slate-700 mb-3">📈 팔로워 (매일 기록)</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold text-slate-700">📈 팔로워</div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">🤖 매일 09:00 자동 수집</span>
+      </div>
       <div class="flex gap-2 text-sm">
         <input id="fDate" type="date" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
         <input id="fCount" type="number" placeholder="팔로워 수" class="border border-slate-200 rounded-lg px-3 py-2 flex-1">
@@ -135,8 +138,8 @@
       </div>
       <div id="followerDelta" class="mt-3 grid grid-cols-2 gap-2"></div>
       <div id="followerList" class="mt-2 space-y-1 text-xs text-slate-500 max-h-24 overflow-y-auto"></div>
-      <div class="mt-3 p-3 bg-indigo-50 rounded-lg text-xs text-indigo-700 leading-relaxed">
-        <b>매일</b> 프로필에서 팔로워 수 보고 한 줄 기록 (10초) → 증감률 자동 계산
+      <div class="mt-3 p-3 bg-emerald-50 rounded-lg text-xs text-emerald-700 leading-relaxed">
+        🤖 <b>매일 오전 9시 자동 수집</b> — 팔로워 수가 자동 기록돼요 (수동 입력도 가능). 증감률 자동 계산.
       </div>
     </div>
   </section>
